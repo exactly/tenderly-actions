@@ -1,0 +1,11 @@
+/actions/abi/
+/actions/types/
+.vscode/
+node_modules/
+out/
+tenderly.yaml
+.DS_Store
+.env
+Thumbs.db
+.*-version*
+*.log

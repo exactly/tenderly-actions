@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "build": "tsc"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/logger": "^5.7.0",
+    "@tenderly/actions": "^0.0.13"
+  }
+}
