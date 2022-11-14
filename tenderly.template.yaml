@@ -3,3 +3,19 @@ actions:
     runtime: v1
     sources: actions
     specs:
+      onMarketUpdate:
+        function: onMarketUpdate:default
+        trigger:
+          type: transaction
+          transaction:
+            status:
+              - mined
+            filters:
+{{# markets }}
+              - network: {{ chainId }}
+                eventEmitted:
+                  name: MarketUpdate
+                  contract:
+                    address: {{ address }}
+                    invocation: any
+{{/ markets }}
