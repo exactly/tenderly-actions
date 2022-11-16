@@ -1,8 +1,8 @@
 import { resolve } from 'path';
 import { runTypeChain } from 'typechain';
 import { writeFile, mkdir } from 'fs/promises';
-import MarketWETH from '@exactly-protocol/protocol/deployments/mainnet/MarketWETH.json';
-import DAI from '@exactly-protocol/protocol/deployments/mainnet/DAI.json';
+import { abi as marketABI } from '@exactly-protocol/protocol/deployments/mainnet/MarketWETH.json';
+import { abi as erc20ABI } from '@exactly-protocol/protocol/deployments/mainnet/DAI.json';
 
 const rootDir = resolve(__dirname, '..');
 
@@ -13,8 +13,8 @@ const writeABI = async (path: string, abi: unknown[]) => {
 
 mkdir('actions/abi', { recursive: true }).then(async () => {
   const allFiles = await Promise.all([
-    writeABI('actions/abi/Market.json', MarketWETH.abi),
-    writeABI('actions/abi/ERC20.json', DAI.abi),
+    writeABI('actions/abi/Market.json', marketABI),
+    writeABI('actions/abi/ERC20.json', erc20ABI),
   ]);
   await runTypeChain({
     filesToProcess: allFiles,

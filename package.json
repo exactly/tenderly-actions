@@ -8,6 +8,7 @@
     "test:mocha": "mocha",
     "test": "run-s --continue-on-error lint test:*",
     "prebuild": "ts-node scripts/prebuild.ts",
+    "postinstall:patch": "patch-package",
     "postinstall:actions": "npm --prefix actions install",
     "postinstall:scripts": "ts-node scripts/postinstall.ts",
     "postinstall": "run-s postinstall:* prebuild"
@@ -19,7 +20,7 @@
     "node": ">=16"
   },
   "devDependencies": {
-    "@exactly-protocol/protocol": "^0.1.0",
+    "@exactly-protocol/protocol": "^0.1.1",
     "@tenderly/actions-test": "^0.0.15",
     "@typechain/ethers-v5": "^10.1.1",
     "@types/chai": "^4.3.4",
@@ -32,6 +33,7 @@
     "@typescript-eslint/parser": "^5.43.0",
     "chai": "^4.3.7",
     "chai-as-promised": "^7.1.1",
+    "dotenv": "^16.0.3",
     "eslint": "^8.27.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-airbnb-typescript": "^17.0.0",
@@ -43,11 +45,11 @@
     "eslint-plugin-mocha": "^10.1.0",
     "eslint-plugin-node": "^11.1.0",
     "mocha": "^10.1.0",
-    "msw": "^0.48.2",
     "mustache": "^4.2.0",
     "npm-run-all": "^4.1.5",
+    "patch-package": "^6.5.0",
     "ts-node": "^10.9.1",
     "typechain": "^8.1.1",
-    "typescript": "^4.8.4"
+    "typescript": "^4.9.3"
   }
 }

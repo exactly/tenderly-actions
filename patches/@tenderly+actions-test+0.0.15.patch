@@ -1,0 +1,73 @@
+diff --git a/node_modules/@tenderly/actions-test/lib/gateways.d.ts b/node_modules/@tenderly/actions-test/lib/gateways.d.ts
+index 00277ed..dd6900b 100644
+--- a/node_modules/@tenderly/actions-test/lib/gateways.d.ts
++++ b/node_modules/@tenderly/actions-test/lib/gateways.d.ts
+@@ -3,5 +3,6 @@ export declare class TestGateways implements Gateways {
+     private gatewayConfig;
+     constructor();
+     getGateway(network: Network, name?: string | undefined): string;
++    setConfig(name: string, config: any): void;
+ }
+ //# sourceMappingURL=gateways.d.ts.map
+\ No newline at end of file
+diff --git a/node_modules/@tenderly/actions-test/lib/gateways.d.ts.map b/node_modules/@tenderly/actions-test/lib/gateways.d.ts.map
+index 6926c6a..98c584c 100644
+--- a/node_modules/@tenderly/actions-test/lib/gateways.d.ts.map
++++ b/node_modules/@tenderly/actions-test/lib/gateways.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"gateways.d.ts","sourceRoot":"","sources":["../src/gateways.ts"],"names":[],"mappings":"AAAA,OAAO,EAAC,QAAQ,EAAE,OAAO,EAAC,MAAM,mBAAmB,CAAC;AAEpD,qBAAa,YAAa,YAAW,QAAQ;IACzC,OAAO,CAAC,aAAa,CAAmB;;IAMxC,UAAU,CAAC,OAAO,EAAE,OAAO,EAAE,IAAI,CAAC,EAAE,MAAM,GAAG,SAAS,GAAG,MAAM;CAIlE"}
+\ No newline at end of file
++{"version":3,"file":"gateways.d.ts","sourceRoot":"","sources":["../src/gateways.ts"],"names":[],"mappings":"AAAA,OAAO,EAAC,QAAQ,EAAE,OAAO,EAAC,MAAM,mBAAmB,CAAC;AAEpD,qBAAa,YAAa,YAAW,QAAQ;IACzC,OAAO,CAAC,aAAa,CAAmB;;IAMxC,UAAU,CAAC,OAAO,EAAE,OAAO,EAAE,IAAI,CAAC,EAAE,MAAM,GAAG,SAAS,GAAG,MAAM;IAK/D,SAAS,CAAC,IAAI,EAAE,MAAM,EAAE,MAAM,EAAE,GAAG;CAGtC"}
+\ No newline at end of file
+diff --git a/node_modules/@tenderly/actions-test/lib/gateways.js b/node_modules/@tenderly/actions-test/lib/gateways.js
+index 31b070e..ef831ff 100644
+--- a/node_modules/@tenderly/actions-test/lib/gateways.js
++++ b/node_modules/@tenderly/actions-test/lib/gateways.js
+@@ -7,7 +7,10 @@ class TestGateways {
+     }
+     getGateway(network, name) {
+         const gatewayConfig = this.gatewayConfig.get(name ?? "");
+-        return `https://${network}.gateway.tenderly.co/${gatewayConfig.accessKey}`;
++        return `https://${network}.gateway.tenderly.co/${gatewayConfig?.accessKey}`;
++    }
++    setConfig(name, config) {
++        this.gatewayConfig.set(name, config);
+     }
+ }
+ exports.TestGateways = TestGateways;
+diff --git a/node_modules/@tenderly/actions-test/lib/gateways.js.map b/node_modules/@tenderly/actions-test/lib/gateways.js.map
+index 6cabbfa..4722119 100644
+--- a/node_modules/@tenderly/actions-test/lib/gateways.js.map
++++ b/node_modules/@tenderly/actions-test/lib/gateways.js.map
+@@ -1 +1 @@
+-{"version":3,"file":"gateways.js","sourceRoot":"","sources":["../src/gateways.ts"],"names":[],"mappings":";;;AAEA,MAAa,YAAY;IAGrB;QACI,IAAI,CAAC,aAAa,GAAG,IAAI,GAAG,EAAe,CAAC;IAChD,CAAC;IAED,UAAU,CAAC,OAAgB,EAAE,IAAyB;QAClD,MAAM,aAAa,GAAG,IAAI,CAAC,aAAa,CAAC,GAAG,CAAC,IAAI,IAAI,EAAE,CAAC,CAAA;QACxD,OAAO,WAAW,OAAO,wBAAwB,aAAa,CAAC,SAAS,EAAE,CAAA;IAC9E,CAAC;CACJ;AAXD,oCAWC"}
+\ No newline at end of file
++{"version":3,"file":"gateways.js","sourceRoot":"","sources":["../src/gateways.ts"],"names":[],"mappings":";;;AAEA,MAAa,YAAY;IAGrB;QACI,IAAI,CAAC,aAAa,GAAG,IAAI,GAAG,EAAe,CAAC;IAChD,CAAC;IAED,UAAU,CAAC,OAAgB,EAAE,IAAyB;QAClD,MAAM,aAAa,GAAG,IAAI,CAAC,aAAa,CAAC,GAAG,CAAC,IAAI,IAAI,EAAE,CAAC,CAAA;QACxD,OAAO,WAAW,OAAO,wBAAwB,aAAa,EAAE,SAAS,EAAE,CAAA;IAC/E,CAAC;IAED,SAAS,CAAC,IAAY,EAAE,MAAW;QAC/B,IAAI,CAAC,aAAa,CAAC,GAAG,CAAC,IAAI,EAAE,MAAM,CAAC,CAAA;IACxC,CAAC;CACJ;AAfD,oCAeC"}
+\ No newline at end of file
+diff --git a/node_modules/@tenderly/actions-test/lib/runtime.d.ts b/node_modules/@tenderly/actions-test/lib/runtime.d.ts
+index ee334fc..44233b9 100644
+--- a/node_modules/@tenderly/actions-test/lib/runtime.d.ts
++++ b/node_modules/@tenderly/actions-test/lib/runtime.d.ts
+@@ -1,10 +1,11 @@
+-import { ActionFn, Context, Event, Gateways } from "@tenderly/actions";
++import { ActionFn, Context, Event } from "@tenderly/actions";
+ import { TestSecrets } from "./secrets";
+ import { TestStorage } from "./storage";
++import { TestGateways } from "./gateways";
+ export declare class TestContext implements Context {
+     secrets: TestSecrets;
+     storage: TestStorage;
+-    gateways: Gateways;
++    gateways: TestGateways;
+     constructor();
+ }
+ export declare class TestRuntime {
+diff --git a/node_modules/@tenderly/actions-test/lib/runtime.d.ts.map b/node_modules/@tenderly/actions-test/lib/runtime.d.ts.map
+index 8f8ce5d..1050954 100644
+--- a/node_modules/@tenderly/actions-test/lib/runtime.d.ts.map
++++ b/node_modules/@tenderly/actions-test/lib/runtime.d.ts.map
+@@ -1 +1 @@
+-{"version":3,"file":"runtime.d.ts","sourceRoot":"","sources":["../src/runtime.ts"],"names":[],"mappings":"AAAA,OAAO,EAAC,QAAQ,EAAE,OAAO,EAAE,KAAK,EAAE,QAAQ,EAAC,MAAM,mBAAmB,CAAC;AACrE,OAAO,EAAC,WAAW,EAAC,MAAM,WAAW,CAAC;AACtC,OAAO,EAAC,WAAW,EAAC,MAAM,WAAW,CAAC;AAGtC,qBAAa,WAAY,YAAW,OAAO;IACvC,OAAO,EAAE,WAAW,CAAC;IACrB,OAAO,EAAE,WAAW,CAAC;IACrB,QAAQ,EAAE,QAAQ,CAAC;;CAOtB;AAED,qBAAa,WAAW;IACpB,OAAO,EAAE,WAAW,CAAC;;IAMf,OAAO,CAAC,MAAM,EAAE,QAAQ,EAAE,KAAK,EAAE,KAAK,GAAG,OAAO,CAAC,IAAI,CAAC;CAG/D"}
+\ No newline at end of file
++{"version":3,"file":"runtime.d.ts","sourceRoot":"","sources":["../src/runtime.ts"],"names":[],"mappings":"AAAA,OAAO,EAAC,QAAQ,EAAE,OAAO,EAAE,KAAK,EAAC,MAAM,mBAAmB,CAAC;AAC3D,OAAO,EAAC,WAAW,EAAC,MAAM,WAAW,CAAC;AACtC,OAAO,EAAC,WAAW,EAAC,MAAM,WAAW,CAAC;AACtC,OAAO,EAAE,YAAY,EAAE,MAAM,YAAY,CAAC;AAE1C,qBAAa,WAAY,YAAW,OAAO;IACvC,OAAO,EAAE,WAAW,CAAC;IACrB,OAAO,EAAE,WAAW,CAAC;IACrB,QAAQ,EAAE,YAAY,CAAC;;CAO1B;AAED,qBAAa,WAAW;IACpB,OAAO,EAAE,WAAW,CAAC;;IAMf,OAAO,CAAC,MAAM,EAAE,QAAQ,EAAE,KAAK,EAAE,KAAK,GAAG,OAAO,CAAC,IAAI,CAAC;CAG/D"}
+\ No newline at end of file
