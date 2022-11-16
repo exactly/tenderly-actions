@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "allowJs": true
   },
-  "include": ["**/.eslintrc.*js", "scripts/**/*", "test/**/*"]
+  "include": ["**/.eslintrc.*js", "**/.mocharc.*js", "scripts/**/*", "test/**/*"]
 }
