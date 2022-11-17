@@ -1,26 +1,19 @@
 import { resolve } from 'path';
+import { writeFile } from 'fs/promises';
 import { runTypeChain } from 'typechain';
-import { writeFile, mkdir } from 'fs/promises';
+import { promise as glob } from 'glob-promise';
+import { abi as previewerABI } from '@exactly-protocol/protocol/deployments/mainnet/Previewer.json';
 import { abi as marketABI } from '@exactly-protocol/protocol/deployments/mainnet/MarketWETH.json';
 import { abi as erc20ABI } from '@exactly-protocol/protocol/deployments/mainnet/DAI.json';
 
-const rootDir = resolve(__dirname, '..');
-
-const writeABI = async (path: string, abi: unknown[]) => {
-  await writeFile(resolve(rootDir, path), JSON.stringify(abi, null, 2));
-  return path;
-};
-
-mkdir('actions/abi', { recursive: true }).then(async () => {
-  const allFiles = await Promise.all([
-    writeABI('actions/abi/Market.json', marketABI),
-    writeABI('actions/abi/ERC20.json', erc20ABI),
-  ]);
-  await runTypeChain({
-    filesToProcess: allFiles,
-    allFiles,
-    target: 'ethers-v5',
-    outDir: 'actions/types',
-    cwd: rootDir,
-  });
-}).catch((error) => { throw error; });
+Promise.all([
+  writeFile(resolve(__dirname, '../actions/abi/Previewer.json'), JSON.stringify(previewerABI, null, 2)),
+  writeFile(resolve(__dirname, '../actions/abi/Market.json'), JSON.stringify(marketABI, null, 2)),
+  writeFile(resolve(__dirname, '../actions/abi/ERC20.json'), JSON.stringify(erc20ABI, null, 2)),
+]).then(() => glob(resolve(__dirname, '../actions/abi/*.json'))).then((allFiles) => runTypeChain({
+  cwd: resolve(__dirname, '../actions'),
+  filesToProcess: allFiles,
+  target: 'ethers-v5',
+  outDir: 'types',
+  allFiles,
+})).catch((error) => { throw error; });
