@@ -75,7 +75,7 @@ export default (async ({ storage, secrets, gateways }, {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           attachments: [{
-            author_name: ens || from,
+            author_name: ens || `${from.slice(0, 6)}…${from.slice(-4)}`,
             author_link: `${etherscan}/address/${from}`,
             title_link: `${etherscan}/tx/${hash}`,
             title: `${formatBigInt(String(log.args.assets), symbol, decimals)} ${noCase(log.name)}`,
