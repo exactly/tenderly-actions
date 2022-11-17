@@ -8,14 +8,14 @@ import borrowPayload from './payloads/borrow.json';
 
 use(chaiAsPromised);
 
-const { TENDERLY_ACCESS_KEY, SLACK_WHALE_ALERT } = env;
+const { GATEWAY_ACCESS_KEY, SLACK_WHALE_ALERT } = env;
 
 describe('on market update', () => {
   let runtime: TestRuntime;
 
   beforeEach(() => {
     runtime = new TestRuntime();
-    runtime.context.gateways.setConfig('', { accessKey: TENDERLY_ACCESS_KEY });
+    runtime.context.gateways.setConfig('', { accessKey: GATEWAY_ACCESS_KEY });
     if (SLACK_WHALE_ALERT) runtime.context.secrets.put('SLACK_WHALE_ALERT@1', SLACK_WHALE_ALERT);
   });
 
