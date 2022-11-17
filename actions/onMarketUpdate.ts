@@ -1,6 +1,7 @@
 import fetch from 'cross-fetch';
 import { noCase } from 'no-case';
 import { Network } from '@tenderly/actions';
+import { namehash } from '@ethersproject/hash';
 import { Contract } from '@ethersproject/contracts';
 import { Interface } from '@ethersproject/abi';
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
@@ -8,25 +9,31 @@ import type { BigNumber } from '@ethersproject/bignumber';
 import type { LogDescription } from '@ethersproject/abi';
 import type { ActionFn, TransactionEvent } from '@tenderly/actions';
 import type { Market, MarketUpdateEventObject } from './types/Market';
-import type { ERC20 } from './types/ERC20';
 import formatBigInt from './utils/formatBigInt';
 import getSecret from './utils/getSecret';
+import multicall from './utils/multicall';
+import resolverABI from './abi/ReverseResolver.json';
 import marketABI from './abi/Market.json';
 import erc20ABI from './abi/ERC20.json';
 
 const WAD = 10n ** 18n;
 
-const decoder = new Interface(marketABI);
+const erc20 = new Interface(erc20ABI);
+const market = new Interface(marketABI);
+const resolver = new Interface(resolverABI);
 
 export default (async ({ storage, secrets, gateways }, {
-  network: chainId, logs, hash, from, blockHash, gasUsed, gasPrice,
+  network: chainId, blockNumber, hash, from, logs, gasUsed, gasPrice,
 }: TransactionEvent) => {
-  const whaleAlert = await getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`);
-  const promises: Promise<unknown>[] = [];
+  const network = { 5: Network.GOERLI }[chainId] ?? Network.MAINNET;
+  const etherscan = `https://${network !== Network.MAINNET ? `${network}.` : ''}etherscan.io`;
+  const provider = new StaticJsonRpcProvider(gateways.getGateway(network));
+
+  const parallel: Promise<unknown>[] = [];
 
   for (const { address, data, topics } of logs) {
     let log: LogDescription;
-    try { log = decoder.parseLog({ data, topics }); } catch { continue; }
+    try { log = market.parseLog({ data, topics }); } catch { continue; }
 
     if (log.name === 'MarketUpdate') {
       const {
@@ -38,33 +45,40 @@ export default (async ({ storage, secrets, gateways }, {
       await storage.putBigInt(key, shareValue);
     }
 
-    const network = { 5: Network.GOERLI }[chainId] ?? Network.MAINNET;
-    const etherscan = `https://${network !== Network.MAINNET ? `${network}.` : ''}etherscan.io`;
-    const provider = new StaticJsonRpcProvider(gateways.getGateway(network));
-    const market = new Contract(address, marketABI, provider) as Market;
+    if (!log.args.assets) continue;
 
-    if (!whaleAlert || !log.args.assets) continue;
-
-    promises.push((async () => {
-      const asset = new Contract(await market.asset(), erc20ABI, provider) as ERC20;
-      const [symbol, decimals, block, ensName] = await Promise.all([
-        asset.symbol(),
-        asset.decimals(),
-        provider.getBlock(blockHash),
-        provider.lookupAddress(from),
-      ]);
-      await fetch(whaleAlert, {
+    parallel.push((new Contract(address, marketABI, provider) as Market).asset()
+      .then((asset) => multicall.connect(provider).callStatic.aggregate([
+        { target: asset, callData: erc20.encodeFunctionData('symbol') },
+        { target: asset, callData: erc20.encodeFunctionData('decimals') },
+        {
+          target: ({
+            [Network.MAINNET]: '0xA2C122BE93b0074270ebeE7f6b7292C7deB45047',
+          } as Record<Network, string>)[network] ?? '0x084b1c3C81545d370f3634392De611CaaBFf8148',
+          callData: resolver.encodeFunctionData('name', [namehash(`${from.substring(2).toLowerCase()}.addr.reverse`)]),
+        },
+        { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
+      ], { blockTag: blockNumber }))
+      .then(([, [symbolData, decimalsData, ensData, tsData]]) => [
+        erc20.decodeFunctionResult('symbol', symbolData)[0],
+        erc20.decodeFunctionResult('decimals', decimalsData)[0],
+        resolver.decodeFunctionResult('name', ensData)[0],
+        multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData)[0],
+      ] as [string, number, string, BigNumber])
+      .then(([symbol, ...rest]) => Promise.all([
+        symbol, ...rest,
+        getSecret(secrets, `${symbol}.icon`),
+        getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
+      ]))
+      .then(([symbol, decimals, ens, ts, icon, whaleAlert]) => (whaleAlert ? fetch(whaleAlert, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           attachments: [{
-            title: `${formatBigInt(String(log.args.assets), symbol, decimals)} ${noCase(log.name)}`,
-            title_link: `${etherscan}/tx/${hash}`,
+            author_name: ens || from,
             author_link: `${etherscan}/address/${from}`,
-            author_name: ensName ?? from,
-            footer_icon: await getSecret(secrets, `${symbol}.icon`),
-            footer: symbol,
-            ts: block.timestamp,
+            title_link: `${etherscan}/tx/${hash}`,
+            title: `${formatBigInt(String(log.args.assets), symbol, decimals)} ${noCase(log.name)}`,
             fields: [
               { short: true, title: 'gas price', value: formatBigInt(gasPrice, 'gwei') },
               { short: true, title: 'gas used', value: BigInt(gasUsed).toLocaleString() },
@@ -76,11 +90,13 @@ export default (async ({ storage, secrets, gateways }, {
                 short: true,
               }] : [],
             ],
+            footer_icon: icon,
+            footer: symbol,
+            ts: ts.toNumber(),
           }],
         }),
-      });
-    })());
+      }) : null)));
   }
 
-  await Promise.all(promises);
+  await Promise.all(parallel);
 }) as ActionFn;
