@@ -8,19 +8,23 @@ import { StaticJsonRpcProvider } from '@ethersproject/providers';
 import type { BigNumber } from '@ethersproject/bignumber';
 import type { LogDescription } from '@ethersproject/abi';
 import type { ActionFn, TransactionEvent } from '@tenderly/actions';
-import type { Market, MarketUpdateEventObject } from './types/Market';
+import type { Market, MarketInterface, MarketUpdateEventObject } from './types/Market';
+import type { PreviewerInterface, Previewer } from './types/Previewer';
+import type { ReverseResolverInterface } from './types/ReverseResolver';
+import type { ERC20 } from './types/ERC20';
 import formatBigInt from './utils/formatBigInt';
 import getSecret from './utils/getSecret';
 import multicall from './utils/multicall';
+import previewerABI from './abi/Previewer.json';
 import resolverABI from './abi/ReverseResolver.json';
 import marketABI from './abi/Market.json';
 import erc20ABI from './abi/ERC20.json';
 
 const WAD = 10n ** 18n;
 
-const erc20 = new Interface(erc20ABI);
-const market = new Interface(marketABI);
-const resolver = new Interface(resolverABI);
+const market = new Interface(marketABI) as MarketInterface;
+const resolver = new Interface(resolverABI) as ReverseResolverInterface;
+const previewer = new Interface(previewerABI) as PreviewerInterface;
 
 export default (async ({ storage, secrets, gateways }, {
   network: chainId, blockNumber, hash, from, logs, gasUsed, gasPrice,
@@ -29,7 +33,24 @@ export default (async ({ storage, secrets, gateways }, {
   const etherscan = `https://${network !== Network.MAINNET ? `${network}.` : ''}etherscan.io`;
   const provider = new StaticJsonRpcProvider(gateways.getGateway(network));
 
-  const parallel: Promise<unknown>[] = [];
+  const global = import(`@exactly-protocol/protocol/deployments/${network}/Previewer.json`)
+    .then(({ address }: { address: string }) => multicall.connect(provider).callStatic.aggregate([
+      { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
+      {
+        target: ({
+          [Network.MAINNET]: '0xA2C122BE93b0074270ebeE7f6b7292C7deB45047',
+        } as Record<Network, string>)[network] ?? '0x084b1c3C81545d370f3634392De611CaaBFf8148',
+        callData: resolver.encodeFunctionData('name', [namehash(`${from.substring(2).toLowerCase()}.addr.reverse`)]),
+      },
+      { target: address, callData: previewer.encodeFunctionData('previewFixed', [WAD]) },
+    ], { blockTag: blockNumber }))
+    .then(([, [ts, name, previews]]) => [
+      multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', ts)[0],
+      resolver.decodeFunctionResult('name', name)[0],
+      previewer.decodeFunctionResult('previewFixed', previews)[0],
+    ] as [BigNumber, string, Previewer.FixedMarketStruct[]]);
+
+  const parallel: Promise<unknown>[] = [global];
 
   for (const { address, data, topics } of logs) {
     let log: LogDescription;
@@ -47,35 +68,30 @@ export default (async ({ storage, secrets, gateways }, {
 
     if (!log.args.assets) continue;
 
-    parallel.push((new Contract(address, marketABI, provider) as Market).asset()
-      .then((asset) => multicall.connect(provider).callStatic.aggregate([
-        { target: asset, callData: erc20.encodeFunctionData('symbol') },
-        { target: asset, callData: erc20.encodeFunctionData('decimals') },
-        {
-          target: ({
-            [Network.MAINNET]: '0xA2C122BE93b0074270ebeE7f6b7292C7deB45047',
-          } as Record<Network, string>)[network] ?? '0x084b1c3C81545d370f3634392De611CaaBFf8148',
-          callData: resolver.encodeFunctionData('name', [namehash(`${from.substring(2).toLowerCase()}.addr.reverse`)]),
-        },
-        { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
-      ], { blockTag: blockNumber }))
-      .then(([, [symbolData, decimalsData, ensData, tsData]]) => [
-        erc20.decodeFunctionResult('symbol', symbolData)[0],
-        erc20.decodeFunctionResult('decimals', decimalsData)[0],
-        resolver.decodeFunctionResult('name', ensData)[0],
-        multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData)[0],
-      ] as [string, number, string, BigNumber])
-      .then(([symbol, ...rest]) => Promise.all([
-        symbol, ...rest,
-        getSecret(secrets, `${symbol}.icon`),
-        getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
-      ]))
-      .then(([symbol, decimals, ens, ts, icon, whaleAlert]) => (whaleAlert ? fetch(whaleAlert, {
+    parallel.push(Promise.all([
+      getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
+
+      (new Contract(address, marketABI, provider) as Market).asset()
+        .then((asset) => (new Contract(asset, erc20ABI, provider) as ERC20).symbol())
+        .then((symbol) => Promise.all([symbol, getSecret(secrets, `${symbol}.icon`)])),
+
+      global.then(([ts, name, previews]) => {
+        const { decimals, deposits, borrows } = previews.find((p) => p.market === address)!;
+        return [ts.toNumber(), name, Number(decimals), deposits, borrows] as [
+          number, string, number, Previewer.FixedPreviewStruct[], Previewer.FixedPreviewStruct[],
+        ];
+      }),
+    ]).then(([
+      whaleAlert,
+      [symbol, icon],
+      [ts, name, decimals],
+    ]) => Promise.all([
+      whaleAlert ? fetch(whaleAlert, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           attachments: [{
-            author_name: ens || `${from.slice(0, 6)}…${from.slice(-4)}`,
+            author_name: name || `${from.slice(0, 6)}…${from.slice(-4)}`,
             author_link: `${etherscan}/address/${from}`,
             title_link: `${etherscan}/tx/${hash}`,
             title: `${formatBigInt(String(log.args.assets), symbol, decimals)} ${noCase(log.name)}`,
@@ -92,10 +108,11 @@ export default (async ({ storage, secrets, gateways }, {
             ],
             footer_icon: icon,
             footer: symbol,
-            ts: ts.toNumber(),
+            ts,
           }],
         }),
-      }) : null)));
+      }) : null,
+    ])));
   }
 
   await Promise.all(parallel);

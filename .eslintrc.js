@@ -18,6 +18,7 @@ module.exports = {
     'eslint-comments/no-unused-disable': 'error',
     '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true, args: 'all', argsIgnorePattern: '^_' }],
     'node/no-unsupported-features/es-syntax': ['error', { ignores: ['modules', 'dynamicImport'] }],
+    '@typescript-eslint/no-non-null-assertion': 'off',
   },
   overrides: [
     { files: ['actions/**/*'], parserOptions: { project: 'actions/tsconfig.json' } },
