@@ -76,7 +76,9 @@ export default (async ({ storage, secrets, gateways }, {
         .then((symbol) => Promise.all([symbol, getSecret(secrets, `${symbol}.icon`)])),
 
       global.then(([ts, name, previews]) => {
-        const { decimals, deposits, borrows } = previews.find((p) => p.market === address)!;
+        const { decimals, deposits, borrows } = previews.find(({
+          market: marketAddress,
+        }) => String(marketAddress).toLowerCase() === address.toLowerCase())!;
         return [ts.toNumber(), name, Number(decimals), deposits, borrows] as [
           number, string, number, Previewer.FixedPreviewStruct[], Previewer.FixedPreviewStruct[],
         ];
