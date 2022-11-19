@@ -9,7 +9,10 @@ const dir = resolve(__dirname, '../node_modules/@exactly-protocol/protocol/deplo
 readdir(dir, { withFileTypes: true })
   .then((files) => files.filter((file) => file.isDirectory()).map(({ name }) => join(dir, name)))
   .then((dirs) => Promise.all(dirs.map(async (path) => {
-    const [chainId, files] = await Promise.all([readFile(join(path, '.chainId')), readdir(path)]);
+    const chainId = await readFile(join(path, '.chainId')).catch(() => null);
+    if (!chainId) return null;
+
+    const files = await readdir(path);
     return Promise.all(files.filter((file) => extname(file) === '.json').map(async (file) => {
       if (basename(file, '.json').endsWith('_Implementation')) return null;
 
