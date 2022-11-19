@@ -124,7 +124,7 @@ export default (async ({ storage, secrets, gateways }, {
     ]) => channel && slack.chat.postMessage({
       channel,
       attachments: [{
-        footer_icon: icon, footer: symbol, ts, ...props,
+        footer_icon: icon, footer: network, ts, ...props,
       }],
     })))));
   }
