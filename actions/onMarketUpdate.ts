@@ -1,8 +1,8 @@
-import fetch from 'cross-fetch';
 import { noCase } from 'no-case';
 import { Network } from '@tenderly/actions';
 import { namehash } from '@ethersproject/hash';
 import { Contract } from '@ethersproject/contracts';
+import { WebClient } from '@slack/web-api';
 import { Interface } from '@ethersproject/abi';
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
 import type { BigNumber } from '@ethersproject/bignumber';
@@ -71,6 +71,7 @@ export default (async ({ storage, secrets, gateways }, {
     if (!log.args.assets) continue;
 
     parallel.push(Promise.all([
+      getSecret(secrets, 'SLACK_TOKEN').then((token) => new WebClient(token)),
       getSecret(secrets, `SLACK_MONITORING@${chainId}`),
       getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
 
@@ -82,7 +83,7 @@ export default (async ({ storage, secrets, gateways }, {
         const {
           decimals, assets, deposits, borrows,
         } = previews.find(({ market: m }) => m.toLowerCase() === address.toLowerCase())!;
-        return [ts.toNumber(), name, decimals, deposits.map(({
+        return [ts.toString(), name, decimals, deposits.map(({
           maturity, assets: depositAssets,
         }, i) => {
           const { assets: borrowAssets } = borrows[i];
@@ -91,10 +92,12 @@ export default (async ({ storage, secrets, gateways }, {
             formatBigInt(depositAssets.sub(assets).mul(YEAR * WAD).div(assets.mul(maturity.sub(ts))), '%'),
             formatBigInt(borrowAssets.sub(assets).mul(YEAR * WAD).div(assets.mul(maturity.sub(ts))), '%'),
           ] : null;
-        }).filter(Boolean)] as [number, string, number, [string, string, string][]];
+        }).filter(Boolean)] as [string, string, number, [string, string, string][]];
       }),
-    ]).then(([monitoring, whaleAlert, [symbol, icon], [ts, name, decimals, arbs]]) => Promise.all(([
-      [monitoring, {
+    ]).then(([
+      slack, monitoring, whaleAlert, [symbol, icon], [ts, name, decimals, arbs],
+    ]) => Promise.all(([
+      [arbs.length && monitoring, {
         color: '#2da44e',
         title: `${symbol} arb @ ${arbs.map(([maturity]) => maturity).join(' & ')}`,
         fields: arbs.flatMap(([maturity, depositRate, borrowRate]) => [
@@ -116,14 +119,13 @@ export default (async ({ storage, secrets, gateways }, {
             ? [{ title: 'maturity', value: formatMaturity(log.args.maturity as BigNumber), short: true }] : [],
         ],
       }],
-    ] as [string | undefined, Record<string, unknown>][]).map(([url, props]) => url && fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        attachments: [{
-          footer_icon: icon, footer: symbol, ts, ...props,
-        }],
-      }),
+    ] as [string | undefined, Record<string, unknown>][]).map(([
+      channel, props,
+    ]) => channel && slack.chat.postMessage({
+      channel,
+      attachments: [{
+        footer_icon: icon, footer: symbol, ts, ...props,
+      }],
     })))));
   }
 

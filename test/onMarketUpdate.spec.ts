@@ -8,7 +8,9 @@ import borrowPayload from './payloads/borrow.json';
 
 use(chaiAsPromised);
 
-const { GATEWAY_ACCESS_KEY, SLACK_MONITORING, SLACK_WHALE_ALERT } = env;
+const {
+  GATEWAY_ACCESS_KEY, SLACK_TOKEN, SLACK_MONITORING, SLACK_WHALE_ALERT,
+} = env;
 
 describe('on market update', () => {
   let runtime: TestRuntime;
@@ -16,6 +18,7 @@ describe('on market update', () => {
   beforeEach(() => {
     runtime = new TestRuntime();
     runtime.context.gateways.setConfig('', { accessKey: GATEWAY_ACCESS_KEY });
+    if (SLACK_TOKEN) runtime.context.secrets.put('SLACK_TOKEN', SLACK_TOKEN);
     if (SLACK_MONITORING) runtime.context.secrets.put('SLACK_MONITORING@1', SLACK_MONITORING);
     if (SLACK_WHALE_ALERT) runtime.context.secrets.put('SLACK_WHALE_ALERT@1', SLACK_WHALE_ALERT);
   });
