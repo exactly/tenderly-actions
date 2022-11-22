@@ -14,7 +14,7 @@ module.exports = {
     'no-continue': 'off',
     'no-await-in-loop': 'off',
     'no-restricted-syntax': 'off',
-    'node/no-missing-import': 'off',
+    'node/no-missing-import': ['error', { tryExtensions: ['.ts', '.js', '.json'] }],
     'eslint-comments/no-unused-disable': 'error',
     '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true, args: 'all', argsIgnorePattern: '^_' }],
     'node/no-unsupported-features/es-syntax': ['error', { ignores: ['modules', 'dynamicImport'] }],
