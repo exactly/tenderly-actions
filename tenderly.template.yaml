@@ -1,6 +1,6 @@
 actions:
   exactly/exactly:
-    runtime: v1
+    runtime: v2
     sources: actions
     specs:
       onMarketUpdate:
