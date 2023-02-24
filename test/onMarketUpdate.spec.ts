@@ -4,7 +4,7 @@ import { expect, use } from 'chai';
 import { TestRuntime } from '@tenderly/actions-test';
 import chaiAsPromised from 'chai-as-promised';
 import onMarketUpdate from '../actions/onMarketUpdate';
-import borrowPayload from './payloads/borrow.json';
+import payload from './payloads/payload.json';
 
 use(chaiAsPromised);
 
@@ -24,14 +24,14 @@ describe('on market update', () => {
   });
 
   it('should store share value', async () => {
-    await runtime.execute(onMarketUpdate, borrowPayload);
-    expect(await runtime.context.storage.getBigInt('1:0xc4d4500326981eacD020e20A81b1c479c161c7EF:shareValue'))
-      .to.equal(1000511293986130291n);
+    await runtime.execute(onMarketUpdate, payload);
+    expect(await runtime.context.storage.getBigInt('1:0x660e2fC185a9fFE722aF253329CEaAD4C9F6F928:shareValue'))
+      .to.equal(1001314617021308273n);
   });
 
   it('should throw when share value decreases', async () => {
-    const key = '1:0xc4d4500326981eacD020e20A81b1c479c161c7EF:shareValue';
+    const key = '1:0x660e2fC185a9fFE722aF253329CEaAD4C9F6F928:shareValue';
     await runtime.context.storage.putBigInt(key, 4200000000000000000n);
-    await expect(runtime.execute(onMarketUpdate, borrowPayload)).to.eventually.be.rejectedWith(`${key} decreased`);
+    await expect(runtime.execute(onMarketUpdate, payload)).to.eventually.be.rejectedWith(`${key} decreased`);
   });
 });

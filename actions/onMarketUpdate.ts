@@ -21,7 +21,6 @@ import resolverABI from './abi/ReverseResolver.json';
 import marketABI from './abi/Market.json';
 
 const WAD = 10n ** 18n;
-const YEAR = 31_536_000n;
 
 const market = new Interface(marketABI) as MarketInterface;
 const resolver = new Interface(resolverABI) as ReverseResolverInterface;
@@ -38,7 +37,7 @@ export default (async ({ storage, secrets, gateways }, {
       .then(async ({ address }: { address: string }) => {
         const provider = new StaticJsonRpcProvider(gateways.getGateway(network));
         const [, [
-          tsData, nameData, exactlyData, fixedPreviewData,
+          tsData, nameData, exactlyData,
         ]] = await multicall.connect(provider).callStatic.aggregate([
           { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
           {
@@ -48,15 +47,12 @@ export default (async ({ storage, secrets, gateways }, {
             callData: resolver.encodeFunctionData('name', [namehash(`${from.substring(2).toLowerCase()}.addr.reverse`)]),
           },
           { target: address, callData: previewer.encodeFunctionData('exactly', [AddressZero]) },
-          { target: address, callData: previewer.encodeFunctionData('previewFixed', [WAD]) },
         ], { blockTag: blockNumber });
         const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
         const [name] = resolver.decodeFunctionResult('name', nameData) as [string];
         const [exactly] = previewer.decodeFunctionResult('exactly', exactlyData) as [Previewer.MarketAccountStructOutput[]];
-        const [fixedPreview] = previewer.decodeFunctionResult('previewFixed', fixedPreviewData) as [Previewer.FixedMarketStructOutput[]];
         return Promise.all([
-          ts, name, exactly, fixedPreview,
-          getIcons(secrets, exactly.map(({ assetSymbol }) => assetSymbol)),
+          ts, name, exactly, getIcons(secrets, exactly.map(({ assetSymbol }) => assetSymbol)),
         ]);
       }),
 
@@ -80,21 +76,18 @@ export default (async ({ storage, secrets, gateways }, {
       if (shareValue < await storage.getBigInt(key)) throw new Error(`${key} decreased`);
       await storage.putBigInt(key, shareValue);
 
-      parallel.push(warmup.then(([[ts, , exactly, fixedPreview, icons], slack, monitoring]) => {
+      parallel.push(warmup.then(([[ts, , exactly, icons], slack, monitoring]) => {
         if (!monitoring) return null;
-        const { assetSymbol: symbol } = exactly
-          .find(({ market: m }) => m.toLowerCase() === address.toLowerCase())!;
-        const { assets, deposits, borrows } = fixedPreview
+        const { assetSymbol: symbol, fixedPools } = exactly
           .find(({ market: m }) => m.toLowerCase() === address.toLowerCase())!;
 
-        const arbs = deposits.map(({ maturity, assets: depositAssets }, i) => {
-          const { assets: borrowAssets } = borrows[i];
-          return depositAssets.gt(borrowAssets) ? [
+        const arbs = fixedPools.map(({ maturity, depositRate, minBorrowRate }) => (
+          depositRate.gt(minBorrowRate) ? [
             formatMaturity(maturity),
-            formatBigInt(depositAssets.sub(assets).mul(YEAR * WAD).div(assets.mul(maturity.sub(ts))), '%'),
-            formatBigInt(borrowAssets.sub(assets).mul(YEAR * WAD).div(assets.mul(maturity.sub(ts))), '%'),
-          ] : null;
-        }).filter(Boolean) as [string, string, string][];
+            formatBigInt(depositRate, '%'),
+            formatBigInt(minBorrowRate, '%'),
+          ] : null
+        )).filter(Boolean) as [string, string, string][];
 
         return arbs.length ? slack.chat.postMessage({
           channel: monitoring,
@@ -115,16 +108,16 @@ export default (async ({ storage, secrets, gateways }, {
 
     if (!log.args.assets) continue;
 
-    parallel.push(warmup.then(([[ts, name, exactly, , icons], slack, , whaleAlert]) => {
+    parallel.push(warmup.then(([[ts, name, exactly, icons], slack, , whaleAlert]) => {
       if (!whaleAlert) return null;
-      const { assetSymbol: symbol, decimals } = exactly
+      const { assetSymbol, decimals } = exactly
         .find(({ market: m }) => m.toLowerCase() === address.toLowerCase())!;
 
       return slack.chat.postMessage({
         channel: whaleAlert,
         attachments: [{
           color: '#3178c6',
-          title: `${formatBigInt(String(log.args.assets), symbol, decimals)} ${noCase(log.name)}`,
+          title: `${formatBigInt(String(log.args.assets), assetSymbol, decimals)} ${noCase(log.name)}`,
           title_link: `${etherscan}/tx/${hash}`,
           author_link: `${etherscan}/address/${from}`,
           author_name: name || `${from.slice(0, 6)}…${from.slice(-4)}`,
@@ -135,7 +128,7 @@ export default (async ({ storage, secrets, gateways }, {
             ...'maturity' in log.args
               ? [{ title: 'maturity', value: formatMaturity(log.args.maturity as BigNumber), short: true }] : [],
           ],
-          footer_icon: icons[symbol],
+          footer_icon: icons[assetSymbol],
           footer: network,
           ts: ts.toString(),
         }],
