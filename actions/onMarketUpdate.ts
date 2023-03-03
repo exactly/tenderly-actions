@@ -1,6 +1,5 @@
 import { noCase } from 'no-case';
 import { Network } from '@tenderly/actions';
-import { namehash } from '@ethersproject/hash';
 import { WebClient } from '@slack/web-api';
 import { Interface } from '@ethersproject/abi';
 import { AddressZero } from '@ethersproject/constants';
@@ -10,46 +9,44 @@ import type { LogDescription } from '@ethersproject/abi';
 import type { ActionFn, TransactionEvent } from '@tenderly/actions';
 import type { MarketInterface, MarketUpdateEventObject } from './types/Market';
 import type { Previewer, PreviewerInterface } from './types/Previewer';
-import type { ReverseResolverInterface } from './types/ReverseResolver';
 import formatMaturity from './utils/formatMaturity';
 import formatBigInt from './utils/formatBigInt';
 import getSecret from './utils/getSecret';
 import multicall from './utils/multicall';
 import getIcons from './utils/getIcons';
 import previewerABI from './abi/Previewer.json';
-import resolverABI from './abi/ReverseResolver.json';
 import marketABI from './abi/Market.json';
 
 const WAD = 10n ** 18n;
 
 const market = new Interface(marketABI) as MarketInterface;
-const resolver = new Interface(resolverABI) as ReverseResolverInterface;
 const previewer = new Interface(previewerABI) as PreviewerInterface;
 
 export default (async ({ storage, secrets, gateways }, {
   network: chainId, blockNumber, hash, from, logs, gasUsed, gasPrice,
 }: TransactionEvent) => {
-  const network = { 5: Network.GOERLI }[chainId] ?? Network.MAINNET;
-  const etherscan = `https://${network !== Network.MAINNET ? `${network}.` : ''}etherscan.io`;
+  const network = { 5: Network.GOERLI, 10: 'optimism' }[chainId] ?? Network.MAINNET;
+  const etherscan = {
+    5: 'https://goerli.etherscan.io',
+    10: 'https://optimistic.etherscan.io',
+  }[chainId] ?? 'https://etherscan.io';
 
   const warmup = Promise.all([
     import(`@exactly-protocol/protocol/deployments/${network}/Previewer.json`)
       .then(async ({ address }: { address: string }) => {
-        const provider = new StaticJsonRpcProvider(gateways.getGateway(network));
-        const [, [
-          tsData, nameData, exactlyData,
-        ]] = await multicall.connect(provider).callStatic.aggregate([
+        const rpc = Object.values<string>(Network).includes(network)
+          ? gateways.getGateway(network as Network)
+          : await secrets.get(`RPC_${chainId}`);
+        const provider = new StaticJsonRpcProvider(rpc);
+        const [, [tsData, exactlyData]] = await multicall.connect(provider).callStatic.aggregate([
           { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
-          {
-            target: ({
-              [Network.MAINNET]: '0xA2C122BE93b0074270ebeE7f6b7292C7deB45047',
-            } as Record<Network, string>)[network] ?? '0x084b1c3C81545d370f3634392De611CaaBFf8148',
-            callData: resolver.encodeFunctionData('name', [namehash(`${from.substring(2).toLowerCase()}.addr.reverse`)]),
-          },
           { target: address, callData: previewer.encodeFunctionData('exactly', [AddressZero]) },
         ], { blockTag: blockNumber });
         const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
-        const [name] = resolver.decodeFunctionResult('name', nameData) as [string];
+        const mainnetProvider = Number(chainId) === 1
+          ? provider
+          : new StaticJsonRpcProvider(gateways.getGateway(Network.MAINNET));
+        const name = mainnetProvider.lookupAddress(from.substring(2));
         const [exactly] = previewer.decodeFunctionResult('exactly', exactlyData) as [Previewer.MarketAccountStructOutput[]];
         return Promise.all([
           ts, name, exactly, getIcons(secrets, exactly.map(({ assetSymbol }) => assetSymbol)),
