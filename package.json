@@ -23,7 +23,7 @@
     "node": ">=16"
   },
   "devDependencies": {
-    "@exactly-protocol/protocol": "^0.2.6",
+    "@exactly-protocol/protocol": "^0.2.7",
     "@tenderly/actions-test": "^0.1.0",
     "@typechain/ethers-v5": "^10.2.0",
     "@types/chai": "^4.3.4",
