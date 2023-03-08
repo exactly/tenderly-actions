@@ -38,15 +38,17 @@ export default (async ({ storage, secrets, gateways }, {
           ? gateways.getGateway(network as Network)
           : await secrets.get(`RPC_${chainId}`);
         const provider = new StaticJsonRpcProvider(rpc);
-        const [, [tsData, exactlyData]] = await multicall.connect(provider).callStatic.aggregate([
-          { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
-          { target: address, callData: previewer.encodeFunctionData('exactly', [AddressZero]) },
-        ], { blockTag: blockNumber });
-        const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
         const mainnetProvider = Number(chainId) === 1
           ? provider
           : new StaticJsonRpcProvider(gateways.getGateway(Network.MAINNET));
-        const name = mainnetProvider.lookupAddress(from.substring(2));
+        const [[, [tsData, exactlyData]], name] = await Promise.all([
+          multicall.connect(provider).callStatic.aggregate([
+            { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
+            { target: address, callData: previewer.encodeFunctionData('exactly', [AddressZero]) },
+          ], { blockTag: blockNumber }),
+          mainnetProvider.lookupAddress(from.substring(2)),
+        ]);
+        const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
         const [exactly] = previewer.decodeFunctionResult('exactly', exactlyData) as [Previewer.MarketAccountStructOutput[]];
         return Promise.all([
           ts, name, exactly, getIcons(secrets, exactly.map(({ assetSymbol }) => assetSymbol)),
