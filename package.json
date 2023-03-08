@@ -11,7 +11,6 @@
     "upgrade": "run-s upgrade:* && npm install",
     "upgrade:ncu": "ncu -u && ncu --cwd actions -u",
     "upgrade:clean": "rimraf '{.,actions}/node_modules' '{.,actions}/package-lock.json'",
-    "postinstall:patch": "patch-package",
     "postinstall:actions": "npm --prefix actions install",
     "postinstall:scripts": "ts-node scripts/postinstall.ts",
     "postinstall": "run-s postinstall:* prebuild"
