@@ -51,7 +51,7 @@ export default (async ({ storage, secrets, gateways }, {
         const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
         const [exactly] = previewer.decodeFunctionResult('exactly', exactlyData) as [Previewer.MarketAccountStructOutput[]];
         return Promise.all([
-          ts, name, exactly, getIcons(secrets, exactly.map(({ assetSymbol }) => assetSymbol)),
+          ts, name, exactly, getIcons(storage, exactly.map(({ assetSymbol }) => assetSymbol)),
         ]);
       }),
 
