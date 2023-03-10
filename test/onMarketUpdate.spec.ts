@@ -17,12 +17,12 @@ describe('on market update', () => {
 
   beforeEach(async () => {
     runtime = new TestRuntime();
-    runtime.context.gateways.setConfig('', { accessKey: GATEWAY_ACCESS_KEY });
     runtime.context.secrets.put('RPC_10', RPC_10);
+    runtime.context.gateways.setConfig('', { accessKey: GATEWAY_ACCESS_KEY });
     await runtime.context.storage.putStr('OP.icon', 'https://cryptologos.cc/logos/optimism-ethereum-op-logo.png');
     if (SLACK_TOKEN) runtime.context.secrets.put('SLACK_TOKEN', SLACK_TOKEN);
-    if (SLACK_MONITORING) runtime.context.secrets.put('SLACK_MONITORING@10', SLACK_MONITORING);
-    if (SLACK_WHALE_ALERT) runtime.context.secrets.put('SLACK_WHALE_ALERT@10', SLACK_WHALE_ALERT);
+    if (SLACK_MONITORING) runtime.context.secrets.put(`SLACK_MONITORING@${payload.network}`, SLACK_MONITORING);
+    if (SLACK_WHALE_ALERT) runtime.context.secrets.put(`SLACK_WHALE_ALERT@${payload.network}`, SLACK_WHALE_ALERT);
   });
 
   it('should execute', async () => {
