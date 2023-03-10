@@ -90,7 +90,7 @@ export default (async ({ storage, secrets, gateways }, {
       parallel.push(slack.chat.postMessage({
         channel: monitoring,
         attachments: [{
-          color: '#2da44e',
+          color: 'warning',
           title: `${assetSymbol} arb @ ${arbs.map(([maturity]) => maturity).join(' & ')}`,
           fields: arbs.flatMap(([maturity, depositRate, borrowRate]) => [
             { short: true, title: `deposit@${maturity}`, value: depositRate },
@@ -109,7 +109,7 @@ export default (async ({ storage, secrets, gateways }, {
     parallel.push(slack.chat.postMessage({
       channel: whaleAlert,
       attachments: [{
-        color: '#3178c6',
+        color: 'good',
         title: `${formatBigInt(String(log.args.assets), assetSymbol, decimals)} ${noCase(log.name)}`,
         title_link: `${etherscan}/tx/${hash}`,
         author_link: `${etherscan}/address/${from}`,
