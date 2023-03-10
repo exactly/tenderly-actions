@@ -38,7 +38,7 @@ export default (async ({ storage, secrets, gateways }, {
   ]);
   const provider = new StaticJsonRpcProvider(rpc);
   const previewer = new Contract(previewerAddress, previewerABI, provider) as Previewer;
-  const [[, [tsData, exactlyData]], prevExactly, name] = await Promise.all([
+  const [[, [tsData, exactlyData]], prevExactly, name, { l1Fee, l1GasPrice }] = await Promise.all([
     multicall.connect(provider).callStatic.aggregate([
       { target: multicall.address, callData: multicall.interface.encodeFunctionData('getCurrentBlockTimestamp') },
       { target: previewer.address, callData: previewer.interface.encodeFunctionData('exactly', [AddressZero]) },
@@ -46,6 +46,8 @@ export default (async ({ storage, secrets, gateways }, {
     previewer.exactly(AddressZero, { blockTag: blockNumber - 1 }),
     (network === Network.MAINNET ? provider
       : new StaticJsonRpcProvider(gateways.getGateway(Network.MAINNET))).lookupAddress(from),
+    network !== 'optimism' ? { l1Fee: '', l1GasPrice: '' }
+      : provider.perform('getTransactionReceipt', { transactionHash: hash }) as Promise<{ l1Fee: string; l1GasPrice: string; }>,
   ]);
   const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
   const [exactly] = previewer.interface.decodeFunctionResult('exactly', exactlyData) as [Previewer.MarketAccountStructOutput[]];
@@ -55,6 +57,7 @@ export default (async ({ storage, secrets, gateways }, {
     getSecret(secrets, `SLACK_MONITORING@${chainId}`),
     getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
   ]);
+  const ethPrice = findMarket(exactly, ({ assetSymbol }) => assetSymbol === 'WETH')!.usdPrice.toBigInt();
 
   const parallel: Promise<unknown>[] = [];
 
@@ -115,9 +118,13 @@ export default (async ({ storage, secrets, gateways }, {
         author_link: `${etherscan}/address/${from}`,
         author_name: name || `${from.slice(0, 6)}…${from.slice(-4)}`,
         fields: [
-          { short: true, title: 'gas price', value: formatBigInt(gasPrice, 'gwei') },
+          { short: true, title: 'gas price', value: formatBigInt(l1GasPrice ?? gasPrice, 'gwei') },
           { short: true, title: 'gas used', value: BigInt(gasUsed).toLocaleString() },
-          { short: true, title: 'tx cost', value: formatBigInt(BigInt(gasUsed) * BigInt(gasPrice), 'Ξ') },
+          {
+            short: true,
+            title: 'tx cost',
+            value: formatBigInt(((BigInt(gasUsed) * BigInt(gasPrice) + BigInt(l1Fee)) * ethPrice) / WAD, '$'),
+          },
           ...'maturity' in log.args
             ? [{ title: 'maturity', value: formatMaturity(log.args.maturity as BigNumber), short: true }] : [],
         ],
