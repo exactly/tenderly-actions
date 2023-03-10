@@ -9,7 +9,7 @@ export default (
     Ξ: 18, gwei: 9, $: 18, '%': 18,
   }[symbol] ?? Number(symbol),
   maximumFractionDigits = {
-    Ξ: 5, gwei: 3, $: 2, '%': 2, WETH: 5, DAI: 2, USDC: 2, WBTC: 5, wstETH: 5, OP: 2,
+    Ξ: 5, gwei: 2, $: 2, '%': 2, WETH: 5, DAI: 2, USDC: 2, WBTC: 5, wstETH: 5, OP: 2,
   }[symbol] ?? decimals,
 ) => `${(Number(n) / 10 ** decimals).toLocaleString(undefined, {
   ...symbol === '$' && { style: 'currency', currency: 'USD' },
