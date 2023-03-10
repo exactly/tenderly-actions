@@ -27,7 +27,7 @@ describe('on market update', () => {
   it('should store share value', async () => {
     await runtime.execute(onMarketUpdate, payload);
     expect(await runtime.context.storage.getBigInt('10:0xa430A427bd00210506589906a71B54d6C256CEdb:shareValue'))
-      .to.equal(1000029577467842007n);
+      .to.equal(1000098712719970367n);
   });
 
   it('should throw when share value decreases', async () => {
