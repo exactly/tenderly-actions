@@ -112,7 +112,10 @@ export default (async ({ storage, secrets, gateways }, {
     parallel.push(slack.chat.postMessage({
       channel: whaleAlert,
       attachments: [{
-        color: 'good',
+        color: {
+          [Network.MAINNET]: '#627EEA',
+          optimism: '#EE2939',
+        }[network],
         title: `${formatBigInt(String(log.args.assets), assetSymbol, decimals)} ${noCase(log.name)}`,
         title_link: `${etherscan}/tx/${hash}`,
         author_link: `${etherscan}/address/${from}`,
