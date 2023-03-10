@@ -34,7 +34,7 @@ export default (async ({ storage, secrets, gateways }, {
 
   const [{ address: previewerAddress }, rpc] = await Promise.all([
     import(`@exactly-protocol/protocol/deployments/${network}/Previewer.json`) as Promise<{ address: string }>,
-    network in Network ? gateways.getGateway(network as Network) : secrets.get(`RPC_${chainId}`),
+    Object.values<string>(Network).includes(network) ? gateways.getGateway(network as Network) : secrets.get(`RPC_${chainId}`),
   ]);
   const provider = new StaticJsonRpcProvider(rpc);
   const previewer = new Contract(previewerAddress, previewerABI, provider) as Previewer;
@@ -118,7 +118,7 @@ export default (async ({ storage, secrets, gateways }, {
         author_link: `${etherscan}/address/${from}`,
         author_name: name || `${from.slice(0, 6)}…${from.slice(-4)}`,
         fields: [
-          { short: true, title: 'gas price', value: formatBigInt(l1GasPrice ?? gasPrice, 'gwei') },
+          { short: true, title: 'gas price', value: formatBigInt(l1GasPrice || gasPrice, 'gwei') },
           { short: true, title: 'gas used', value: BigInt(gasUsed).toLocaleString() },
           {
             short: true,
