@@ -8,9 +8,7 @@ import payload from './payloads/payload.json';
 
 use(chaiAsPromised);
 
-const {
-  GATEWAY_ACCESS_KEY, SLACK_TOKEN, SLACK_MONITORING, SLACK_WHALE_ALERT, RPC_10 = 'https://mainnet.optimism.io',
-} = env;
+const { GATEWAY_ACCESS_KEY, SLACK_TOKEN, RPC_10 = 'https://mainnet.optimism.io' } = env;
 
 describe('on market update', () => {
   let runtime: TestRuntime;
@@ -21,11 +19,11 @@ describe('on market update', () => {
     runtime.context.gateways.setConfig('', { accessKey: GATEWAY_ACCESS_KEY });
     await runtime.context.storage.putStr('OP.icon', 'https://cryptologos.cc/logos/optimism-ethereum-op-logo.png');
     if (SLACK_TOKEN) runtime.context.secrets.put('SLACK_TOKEN', SLACK_TOKEN);
-    if (SLACK_MONITORING) runtime.context.secrets.put(`SLACK_MONITORING@${payload.network}`, SLACK_MONITORING);
-    if (SLACK_WHALE_ALERT) runtime.context.secrets.put(`SLACK_WHALE_ALERT@${payload.network}`, SLACK_WHALE_ALERT);
+    for (const [key, value] of Object.entries(env)) {
+      if (key.startsWith('SLACK_')) runtime.context.secrets.put(`${key}@${payload.network}`, value!);
+      else await runtime.context.storage.putStr(key, value!);
+    }
   });
 
-  it('should execute', async () => {
-    await runtime.execute(onMarketUpdate, payload);
-  });
+  it('should execute', () => runtime.execute(onMarketUpdate, payload));
 });

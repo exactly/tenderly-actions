@@ -1,13 +1,11 @@
 import { noCase } from 'no-case';
-import { Network } from '@tenderly/actions';
-import { WebClient } from '@slack/web-api';
 import { Contract } from '@ethersproject/contracts';
-import { Interface } from '@ethersproject/abi';
 import { AddressZero } from '@ethersproject/constants';
+import { type BigNumber } from '@ethersproject/bignumber';
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
-import type { BigNumber } from '@ethersproject/bignumber';
-import type { LogDescription } from '@ethersproject/abi';
-import type { ActionFn, TransactionEvent } from '@tenderly/actions';
+import { Interface, type LogDescription } from '@ethersproject/abi';
+import { type ChatPostMessageArguments, WebClient } from '@slack/web-api';
+import { type ActionFn, Network, type TransactionEvent } from '@tenderly/actions';
 import type { MarketInterface } from './types/Market';
 import type { Previewer } from './types/Previewer';
 import formatMaturity from './utils/formatMaturity';
@@ -51,11 +49,15 @@ export default (async ({ storage, secrets, gateways }, {
   ]);
   const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
   const [exactly] = previewer.interface.decodeFunctionResult('exactly', exactlyData) as [Previewer.MarketAccountStructOutput[]];
-  const [icons, slack, monitoring, whaleAlert] = await Promise.all([
+  const [
+    icons, slack, monitoring, whaleAlert, transactions, whaleThreshold = 0,
+  ] = await Promise.all([
     getIcons(storage, exactly.map(({ assetSymbol }) => assetSymbol)),
     getSecret(secrets, 'SLACK_TOKEN').then((token) => new WebClient(token)),
     getSecret(secrets, `SLACK_MONITORING@${chainId}`),
     getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
+    getSecret(secrets, `SLACK_TRANSACTIONS@${chainId}`),
+    storage.getNumber('WHALE_USD_THRESHOLD'),
   ]);
   const ethPrice = findMarket(exactly, ({ assetSymbol }) => assetSymbol === 'WETH')!.usdPrice.toBigInt();
 
@@ -106,17 +108,17 @@ export default (async ({ storage, secrets, gateways }, {
       }));
     }
 
-    if (!whaleAlert || !log.args.assets) continue;
+    if (!log.args.assets) continue;
 
-    const { assetSymbol, decimals } = findMarket(exactly, address)!;
-    parallel.push(slack.chat.postMessage({
-      channel: whaleAlert,
+    const assets = log.args.assets as BigNumber;
+    const { assetSymbol, decimals, usdPrice } = findMarket(exactly, address)!;
+    const message: Omit<ChatPostMessageArguments, 'channel'> = {
       attachments: [{
         color: {
           [Network.MAINNET]: '#627EEA',
           optimism: '#EE2939',
         }[network],
-        title: `${formatBigInt(String(log.args.assets), assetSymbol, decimals)} ${noCase(log.name)}`,
+        title: `${formatBigInt(assets, assetSymbol, decimals)} ${noCase(log.name)}`,
         title_link: `${etherscan}/tx/${hash}`,
         author_link: `${etherscan}/address/${from}`,
         author_name: name || `${from.slice(0, 6)}…${from.slice(-4)}`,
@@ -135,7 +137,11 @@ export default (async ({ storage, secrets, gateways }, {
         footer: network,
         ts: ts.toString(),
       }],
-    }));
+    };
+    if (transactions) parallel.push(slack.chat.postMessage({ ...message, channel: transactions }));
+    if (whaleAlert && Number(usdPrice.mul(assets)) / 10 ** (18 + decimals) >= whaleThreshold) {
+      parallel.push(slack.chat.postMessage({ ...message, channel: whaleAlert }));
+    }
   }
 
   await Promise.all(parallel);
