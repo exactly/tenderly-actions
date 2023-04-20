@@ -111,7 +111,10 @@ export default (async ({ storage, secrets, gateways }, {
     if (!log.args.assets) continue;
 
     const assets = log.args.assets as BigNumber;
-    const { assetSymbol, decimals, usdPrice } = findMarket(exactly, address)!;
+    const exaMarket = findMarket(exactly, address);
+    if (!exaMarket) continue;
+
+    const { assetSymbol, decimals, usdPrice } = exaMarket;
     const message: Omit<ChatPostMessageArguments, 'channel'> = {
       attachments: [{
         color: {
