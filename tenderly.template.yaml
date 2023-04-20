@@ -3,6 +3,12 @@ actions:
     runtime: v2
     sources: actions
     specs:
+      onNotifyDebtors:
+        function: onNotifyDebtors:default
+        trigger:
+          type: periodic
+          periodic:
+            cron: "0 0 * * *"
       onMarketUpdate:
         function: onMarketUpdate:default
         trigger:
