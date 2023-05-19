@@ -5,7 +5,9 @@ import { type BigNumber } from '@ethersproject/bignumber';
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, type LogDescription } from '@ethersproject/abi';
 import { type ChatPostMessageArguments, WebClient } from '@slack/web-api';
-import { type ActionFn, Network, type TransactionEvent } from '@tenderly/actions';
+import {
+  type ActionFn, type GatewayNetwork, Network, type TransactionEvent,
+} from '@tenderly/actions';
 import type { MarketInterface } from './types/Market';
 import type { Previewer } from './types/Previewer';
 import formatMaturity from './utils/formatMaturity';
@@ -31,8 +33,8 @@ export default (async ({ storage, secrets, gateways }, {
   }[chainId] ?? 'https://etherscan.io';
 
   const [{ address: previewerAddress }, rpc] = await Promise.all([
-    import(`@exactly-protocol/protocol/deployments/${network}/Previewer.json`) as Promise<{ address: string }>,
-    Object.values<string>(Network).includes(network) ? gateways.getGateway(network as Network) : secrets.get(`RPC_${chainId}`),
+    import(`@exactly/protocol/deployments/${network}/Previewer.json`) as Promise<{ address: string }>,
+    network !== 'optimism' ? gateways.getGateway(network as GatewayNetwork) : secrets.get(`RPC_${chainId}`),
   ]);
   const provider = new StaticJsonRpcProvider(rpc);
   const previewer = new Contract(previewerAddress, previewerABI, provider) as Previewer;

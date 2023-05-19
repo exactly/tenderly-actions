@@ -4,7 +4,7 @@ import {
   basename, extname, join, resolve,
 } from 'path';
 
-const dir = resolve(__dirname, '../node_modules/@exactly-protocol/protocol/deployments');
+const dir = resolve(__dirname, '../node_modules/@exactly/protocol/deployments');
 
 readdir(dir, { withFileTypes: true })
   .then((files) => files.filter((file) => file.isDirectory()).map(({ name }) => join(dir, name)))
