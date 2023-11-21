@@ -18,6 +18,7 @@ describe('on market update', () => {
     runtime.context.secrets.put('RPC_10', RPC_10);
     runtime.context.gateways.setConfig('', { accessKey: GATEWAY_ACCESS_KEY });
     await runtime.context.storage.putStr('OP.icon', 'https://cryptologos.cc/logos/optimism-ethereum-op-logo.png');
+    await runtime.context.storage.putStr('UTILIZATION_THRESHOLD', '0.8');
     if (SLACK_TOKEN) runtime.context.secrets.put('SLACK_TOKEN', SLACK_TOKEN);
     for (const [key, value] of Object.entries(env)) {
       if (key.startsWith('SLACK_')) runtime.context.secrets.put(`${key}@${payload.network}`, value!);

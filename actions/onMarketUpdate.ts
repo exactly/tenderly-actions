@@ -31,6 +31,7 @@ export default (async ({ storage, secrets, gateways }, {
     5: 'https://goerli.etherscan.io',
     10: 'https://optimistic.etherscan.io',
   }[chainId] ?? 'https://etherscan.io';
+  const app = 'https://app.exact.ly';
 
   const [{ address: previewerAddress }, rpc] = await Promise.all([
     import(`@exactly/protocol/deployments/${network}/Previewer.json`) as Promise<{ address: string }>,
@@ -53,6 +54,7 @@ export default (async ({ storage, secrets, gateways }, {
   const [exactly] = previewer.interface.decodeFunctionResult('exactly', exactlyData) as [Previewer.MarketAccountStructOutput[]];
   const [
     icons, slack, monitoring, whaleAlert, transactions, whaleThreshold = 0,
+    utilizationThreshold = 0,
   ] = await Promise.all([
     getIcons(storage, exactly.map(({ assetSymbol }) => assetSymbol)),
     getSecret(secrets, 'SLACK_TOKEN').then((token) => new WebClient(token)),
@@ -60,6 +62,7 @@ export default (async ({ storage, secrets, gateways }, {
     getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
     getSecret(secrets, `SLACK_TRANSACTIONS@${chainId}`),
     storage.getNumber('WHALE_USD_THRESHOLD'),
+    storage.getNumber('UTILIZATION_THRESHOLD'),
   ]);
   const ethPrice = findMarket(exactly, ({ assetSymbol }) => assetSymbol === 'WETH')!.usdPrice.toBigInt();
 
@@ -72,6 +75,7 @@ export default (async ({ storage, secrets, gateways }, {
     if (log.name === 'MarketUpdate') {
       const {
         assetSymbol, fixedPools, totalFloatingDepositAssets, totalFloatingDepositShares,
+        totalFloatingBorrowAssets,
       } = findMarket(exactly, address)!;
       const {
         totalFloatingDepositAssets: prevAssets, totalFloatingDepositShares: prevShares,
@@ -84,6 +88,35 @@ export default (async ({ storage, secrets, gateways }, {
       if (shareValue < prevShareValue) parallel.push(Promise.reject(new Error('share value decreased')));
 
       if (!monitoring) continue;
+
+      const assets = totalFloatingDepositAssets.toBigInt();
+      const floatingDebt = totalFloatingBorrowAssets.toBigInt();
+      const fixedAssets = fixedPools.reduce((total, { supplied, borrowed }) => (
+        total + supplied.toBigInt() - borrowed.toBigInt()), 0n);
+      const debt = floatingDebt - (fixedAssets < 0n ? fixedAssets : 0n);
+      const utilization = Number((debt * WAD) / assets) / 10 ** 18;
+
+      if (utilization >= utilizationThreshold) {
+        parallel.push(slack.chat.postMessage({
+          channel: monitoring,
+          attachments: [{
+            color: 'warning',
+            title: `${assetSymbol} utilization above threshold`,
+            title_link: `${app}/${assetSymbol}`,
+            fields: [
+              {
+                short: true,
+                title: 'global utilization',
+                value: utilization.toLocaleString(undefined, { style: 'percent', maximumFractionDigits: 2 }),
+              },
+              { short: true, title: 'floating utilization', value: formatBigInt((floatingDebt * WAD) / assets, '%') },
+            ],
+            footer_icon: icons[assetSymbol],
+            footer: network,
+            ts: ts.toString(),
+          }],
+        }));
+      }
 
       const arbs = fixedPools.map(({ maturity, depositRate, minBorrowRate }) => (
         depositRate.gt(minBorrowRate) ? [
