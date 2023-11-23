@@ -2,9 +2,9 @@ import { resolve } from 'path';
 import { writeFile } from 'fs/promises';
 import { runTypeChain } from 'typechain';
 import { promise as glob } from 'glob-promise';
-import { abi as previewerABI } from '@exactly/protocol/deployments/mainnet/Previewer.json';
-import { abi as marketABI } from '@exactly/protocol/deployments/mainnet/MarketWETH.json';
-import { abi as erc20ABI } from '@exactly/protocol/deployments/mainnet/DAI.json';
+import { abi as previewerABI } from '@exactly/protocol/deployments/ethereum/Previewer.json';
+import { abi as marketABI } from '@exactly/protocol/deployments/ethereum/MarketWETH.json';
+import { abi as erc20ABI } from '@exactly/protocol/deployments/ethereum/DAI.json';
 
 Promise.all([
   writeFile(resolve(__dirname, '../actions/abi/Previewer.json'), JSON.stringify(previewerABI, null, 2)),

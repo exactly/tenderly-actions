@@ -45,7 +45,7 @@ export default (async ({ storage, secrets, gateways }, {
       { target: previewer.address, callData: previewer.interface.encodeFunctionData('exactly', [AddressZero]) },
     ], { blockTag: blockNumber }),
     previewer.exactly(AddressZero, { blockTag: blockNumber - 1 }),
-    (network === Network.MAINNET ? provider
+    (network === String(Network.MAINNET) ? provider
       : new StaticJsonRpcProvider(gateways.getGateway(Network.MAINNET))).lookupAddress(from),
     network !== 'optimism' ? { l1Fee: '', l1GasPrice: '' }
       : provider.perform('getTransactionReceipt', { transactionHash: hash }) as Promise<{ l1Fee: string; l1GasPrice: string; }>,
