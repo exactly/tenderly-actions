@@ -8,10 +8,10 @@ jobs:
       GATEWAY_ACCESS_KEY: ${{ secrets.GATEWAY_ACCESS_KEY }}
       TENDERLY_ACCESS_KEY: ${{ secrets.TENDERLY_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
           cache: npm
 
       - run: npm install
