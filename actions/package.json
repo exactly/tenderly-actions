@@ -13,9 +13,9 @@
     "@ethersproject/hash": "^5.7.0",
     "@ethersproject/logger": "^5.7.0",
     "@ethersproject/providers": "^5.7.2",
-    "@exactly/protocol": "^0.2.10",
-    "@slack/web-api": "^6.8.1",
-    "@tenderly/actions": "^0.2.3",
+    "@exactly/protocol": "exactly/protocol#8ae3561e18d08930a28f85f136fba8372876c383",
+    "@slack/web-api": "^7.0.4",
+    "@tenderly/actions": "^0.2.56",
     "no-case": "^3.0.4"
   }
 }
