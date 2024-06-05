@@ -5,6 +5,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
+      RPC_10: ${{ secrets.RPC_10 }}
       GATEWAY_ACCESS_KEY: ${{ secrets.GATEWAY_ACCESS_KEY }}
       TENDERLY_ACCESS_KEY: ${{ secrets.TENDERLY_ACCESS_KEY }}
     steps:
