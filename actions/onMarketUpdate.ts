@@ -4,10 +4,8 @@ import { AddressZero } from '@ethersproject/constants';
 import { type BigNumber } from '@ethersproject/bignumber';
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, type LogDescription } from '@ethersproject/abi';
-import { type ChatPostMessageArguments, WebClient } from '@slack/web-api';
-import {
-  type ActionFn, type GatewayNetwork, Network, type TransactionEvent,
-} from '@tenderly/actions';
+import { type MessageAttachment, WebClient } from '@slack/web-api';
+import { type ActionFn, Network, type TransactionEvent } from '@tenderly/actions';
 import type { MarketInterface } from './types/Market';
 import type { Previewer } from './types/Previewer';
 import formatMaturity from './utils/formatMaturity';
@@ -26,16 +24,23 @@ const market = new Interface(marketABI) as MarketInterface;
 export default (async ({ storage, secrets, gateways }, {
   network: chainId, blockNumber, hash, from, logs, gasUsed, gasPrice,
 }: TransactionEvent) => {
-  const network = { 5: Network.GOERLI, 10: 'optimism' }[chainId] ?? Network.MAINNET;
+  const network = {
+    10: Network.OPTIMISTIC as const,
+    11155420: Network.OPTIMISTIC_SEPOLIA as const,
+  }[chainId] ?? Network.MAINNET;
   const etherscan = {
-    5: 'https://goerli.etherscan.io',
-    10: 'https://optimistic.etherscan.io',
+    10: 'https://optimistic.etherscan.io' as const,
+    511155420: 'https://sepolia-optimism.etherscan.io' as const,
   }[chainId] ?? 'https://etherscan.io';
   const app = 'https://app.exact.ly';
 
   const [{ address: previewerAddress }, rpc] = await Promise.all([
-    import(`@exactly/protocol/deployments/${network}/Previewer.json`) as Promise<{ address: string }>,
-    network !== 'optimism' ? gateways.getGateway(network as GatewayNetwork) : secrets.get(`RPC_${chainId}`),
+    import(`@exactly/protocol/deployments/${{
+      [Network.MAINNET]: 'ethereum',
+      [Network.OPTIMISTIC]: 'optimism',
+      [Network.OPTIMISTIC_SEPOLIA]: 'op-sepolia',
+    }[network]}/Previewer.json`) as Promise<{ address: string }>,
+    network === Network.MAINNET ? gateways.getGateway(network) : secrets.get(`RPC_${chainId}`),
   ]);
   const provider = new StaticJsonRpcProvider(rpc);
   const previewer = new Contract(previewerAddress, previewerABI, provider) as Previewer;
@@ -47,7 +52,7 @@ export default (async ({ storage, secrets, gateways }, {
     previewer.exactly(AddressZero, { blockTag: blockNumber - 1 }),
     (network === Network.MAINNET ? provider
       : new StaticJsonRpcProvider(gateways.getGateway(Network.MAINNET))).lookupAddress(from),
-    network !== 'optimism' ? { l1Fee: '', l1GasPrice: '' }
+    network === Network.MAINNET ? { l1Fee: '', l1GasPrice: '' }
       : provider.perform('getTransactionReceipt', { transactionHash: hash }) as Promise<{ l1Fee: string; l1GasPrice: string; }>,
   ]);
   const [ts] = multicall.interface.decodeFunctionResult('getCurrentBlockTimestamp', tsData) as [BigNumber];
@@ -150,35 +155,34 @@ export default (async ({ storage, secrets, gateways }, {
     if (!exaMarket) continue;
 
     const { assetSymbol, decimals, usdPrice } = exaMarket;
-    const message: Omit<ChatPostMessageArguments, 'channel'> = {
-      attachments: [{
-        color: {
-          [Network.MAINNET]: '#627EEA',
-          optimism: '#EE2939',
-        }[network],
-        title: `${formatBigInt(assets, assetSymbol, decimals)} ${noCase(log.name)}`,
-        title_link: `${etherscan}/tx/${hash}`,
-        author_link: `${etherscan}/address/${from}`,
-        author_name: name || `${from.slice(0, 6)}…${from.slice(-4)}`,
-        fields: [
-          { short: true, title: 'gas price', value: formatBigInt(l1GasPrice || gasPrice, 'gwei') },
-          { short: true, title: 'gas used', value: BigInt(gasUsed).toLocaleString() },
-          {
-            short: true,
-            title: 'tx cost',
-            value: formatBigInt(((BigInt(gasUsed) * BigInt(gasPrice) + BigInt(l1Fee)) * ethPrice) / WAD, '$'),
-          },
-          ...'maturity' in log.args
-            ? [{ title: 'maturity', value: formatMaturity(log.args.maturity as BigNumber), short: true }] : [],
-        ],
-        footer_icon: icons[assetSymbol],
-        footer: network,
-        ts: ts.toString(),
-      }],
-    };
-    if (transactions) parallel.push(slack.chat.postMessage({ ...message, channel: transactions }));
+    const attachments: MessageAttachment[] = [{
+      color: {
+        [Network.MAINNET]: '#627EEA',
+        [Network.OPTIMISTIC]: '#EE2939',
+        [Network.OPTIMISTIC_SEPOLIA]: '#FFFFFF',
+      }[network],
+      title: `${formatBigInt(assets, assetSymbol, decimals)} ${noCase(log.name)}`,
+      title_link: `${etherscan}/tx/${hash}`,
+      author_link: `${etherscan}/address/${from}`,
+      author_name: name || `${from.slice(0, 6)}…${from.slice(-4)}`,
+      fields: [
+        { short: true, title: 'gas price', value: formatBigInt(l1GasPrice || gasPrice, 'gwei') },
+        { short: true, title: 'gas used', value: BigInt(gasUsed).toLocaleString() },
+        {
+          short: true,
+          title: 'tx cost',
+          value: formatBigInt(((BigInt(gasUsed) * BigInt(gasPrice) + BigInt(l1Fee)) * ethPrice) / WAD, '$'),
+        },
+        ...'maturity' in log.args
+          ? [{ title: 'maturity', value: formatMaturity(log.args.maturity as BigNumber), short: true }] : [],
+      ],
+      footer_icon: icons[assetSymbol],
+      footer: network,
+      ts: ts.toString(),
+    }];
+    if (transactions) parallel.push(slack.chat.postMessage({ attachments, channel: transactions }));
     if (whaleAlert && Number(usdPrice.mul(assets)) / 10 ** (18 + decimals) >= whaleThreshold) {
-      parallel.push(slack.chat.postMessage({ ...message, channel: whaleAlert }));
+      parallel.push(slack.chat.postMessage({ attachments, channel: whaleAlert }));
     }
   }
 
