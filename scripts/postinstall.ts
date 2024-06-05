@@ -4,12 +4,10 @@ import { runTypeChain } from 'typechain';
 import { promise as glob } from 'glob-promise';
 import { abi as previewerABI } from '@exactly/protocol/deployments/ethereum/Previewer.json';
 import { abi as marketABI } from '@exactly/protocol/deployments/ethereum/MarketWETH.json';
-import { abi as erc20ABI } from '@exactly/protocol/deployments/ethereum/DAI.json';
 
 Promise.all([
   writeFile(resolve(__dirname, '../actions/abi/Previewer.json'), JSON.stringify(previewerABI, null, 2)),
   writeFile(resolve(__dirname, '../actions/abi/Market.json'), JSON.stringify(marketABI, null, 2)),
-  writeFile(resolve(__dirname, '../actions/abi/ERC20.json'), JSON.stringify(erc20ABI, null, 2)),
 ]).then(() => glob(resolve(__dirname, '../actions/abi/*.json'))).then((allFiles) => runTypeChain({
   cwd: resolve(__dirname, '../actions'),
   filesToProcess: allFiles,

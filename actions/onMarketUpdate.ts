@@ -1,9 +1,9 @@
 import { noCase } from 'no-case';
-import { Contract } from '@ethersproject/contracts';
 import { AddressZero } from '@ethersproject/constants';
 import { type BigNumber } from '@ethersproject/bignumber';
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
 import { Interface, type LogDescription } from '@ethersproject/abi';
+import { Contract, type ContractInterface } from '@ethersproject/contracts';
 import { type MessageAttachment, WebClient } from '@slack/web-api';
 import { type ActionFn, Network, type TransactionEvent } from '@tenderly/actions';
 import type { MarketInterface } from './types/Market';
@@ -14,7 +14,6 @@ import findMarket from './utils/findMarket';
 import getSecret from './utils/getSecret';
 import multicall from './utils/multicall';
 import getIcons from './utils/getIcons';
-import previewerABI from './abi/Previewer.json';
 import marketABI from './abi/Market.json';
 
 const WAD = 10n ** 18n;
@@ -34,12 +33,12 @@ export default (async ({ storage, secrets, gateways }, {
   }[chainId] ?? 'https://etherscan.io';
   const app = 'https://app.exact.ly';
 
-  const [{ address: previewerAddress }, rpc] = await Promise.all([
+  const [{ address: previewerAddress, abi: previewerABI }, rpc] = await Promise.all([
     import(`@exactly/protocol/deployments/${{
       [Network.MAINNET]: 'ethereum',
       [Network.OPTIMISTIC]: 'optimism',
       [Network.OPTIMISTIC_SEPOLIA]: 'op-sepolia',
-    }[network]}/Previewer.json`) as Promise<{ address: string }>,
+    }[network]}/Previewer.json`) as Promise<{ address: string, abi: ContractInterface }>,
     network === Network.MAINNET ? gateways.getGateway(network) : secrets.get(`RPC_${chainId}`),
   ]);
   const provider = new StaticJsonRpcProvider(rpc);
