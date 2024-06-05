@@ -12,10 +12,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+      - uses: oven-sh/setup-bun@v1
 
-      - run: npm install
-      - run: npm test
+      - run: bun install
+      - run: bun run test
 
       - run: curl https://raw.githubusercontent.com/Tenderly/tenderly-cli/master/scripts/install-linux.sh | bash
       - run: tenderly login --authentication-method access-key --access-key ${{ secrets.TENDERLY_ACCESS_KEY }}

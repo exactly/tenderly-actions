@@ -1,12 +1,9 @@
 import 'dotenv/config';
-import { use } from 'chai';
 import { env } from 'process';
+import { beforeEach, describe, test } from 'bun:test';
 import { TestRuntime } from '@tenderly/actions-test';
-import chaiAsPromised from 'chai-as-promised';
 import onMarketUpdate from '../actions/onMarketUpdate';
 import payload from './payloads/payload.json';
-
-use(chaiAsPromised);
 
 const { GATEWAY_ACCESS_KEY, SLACK_TOKEN, RPC_10 = 'https://mainnet.optimism.io' } = env;
 
@@ -26,5 +23,5 @@ describe('on market update', () => {
     }
   });
 
-  it('should execute', () => runtime.execute(onMarketUpdate, payload));
+  test('should execute', () => runtime.execute(onMarketUpdate, payload));
 });

@@ -27,6 +27,7 @@ module.exports = {
       files: ['test/**/*'],
       extends: ['plugin:mocha/recommended', 'plugin:chai-expect/recommended', 'plugin:chai-friendly/recommended'],
       rules: {
+        'node/no-missing-import': 'off',
         'mocha/no-mocha-arrows': 'off',
         'mocha/no-exclusive-tests': 'error',
       },
