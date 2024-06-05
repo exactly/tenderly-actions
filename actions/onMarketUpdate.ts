@@ -56,7 +56,7 @@ export default (async ({ storage, secrets, gateways }, {
     icons, slack, monitoring, whaleAlert, transactions, whaleThreshold = 0,
     utilizationThreshold = 0,
   ] = await Promise.all([
-    getIcons(storage, exactly.map(({ assetSymbol }) => assetSymbol)),
+    getIcons(storage, exactly.map(({ symbol }) => symbol.slice(3))),
     getSecret(secrets, 'SLACK_TOKEN').then((token) => new WebClient(token)),
     getSecret(secrets, `SLACK_MONITORING@${chainId}`),
     getSecret(secrets, `SLACK_WHALE_ALERT@${chainId}`),
